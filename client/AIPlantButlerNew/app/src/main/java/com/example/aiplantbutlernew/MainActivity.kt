@@ -1,5 +1,7 @@
 package com.example.aiplantbutlernew
 
+import com.example.aiplantbutlernew.CalendarLegacyFragment
+
 import android.os.Bundle
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
@@ -25,7 +27,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         buttonCalendar.setOnClickListener {
-            loadFragment(CalendarFragment())
+            loadFragment(PhotoDiaryCalendarFragment())
         }
 
         fabHome.setOnClickListener {
@@ -34,8 +36,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadFragment(fragment: Fragment) {
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.main_frame, fragment)
+        supportFragmentManager
+            .beginTransaction()
+            .replace(R.id.fragment_container, fragment)
             .commit()
     }
 }

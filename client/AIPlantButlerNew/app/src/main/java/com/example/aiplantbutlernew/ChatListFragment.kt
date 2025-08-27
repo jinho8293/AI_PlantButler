@@ -1,12 +1,12 @@
 package com.example.aiplantbutlernew
 
 import android.os.Bundle
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,7 +19,11 @@ class ChatListFragment : Fragment(), ChatRoomAdapter.OnItemInteractionListener {
     private lateinit var chatDao: ChatDao
     private lateinit var chatRoomAdapter: ChatRoomAdapter
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         return inflater.inflate(R.layout.fragment_chat_list, container, false)
     }
 
@@ -34,7 +38,9 @@ class ChatListFragment : Fragment(), ChatRoomAdapter.OnItemInteractionListener {
         chatRoomAdapter = ChatRoomAdapter(emptyList(), this)
         recyclerView.adapter = chatRoomAdapter
         recyclerView.layoutManager = LinearLayoutManager(context)
-        recyclerView.addItemDecoration(DividerItemDecoration(context, DividerItemDecoration.VERTICAL))
+        recyclerView.addItemDecoration(
+            DividerItemDecoration(context, DividerItemDecoration.VERTICAL)
+        )
 
         viewLifecycleOwner.lifecycleScope.launch {
             chatDao.getAllChatRooms().collect { chatRooms ->
@@ -43,19 +49,19 @@ class ChatListFragment : Fragment(), ChatRoomAdapter.OnItemInteractionListener {
         }
 
         fabNewChat.setOnClickListener {
-            showRenameDialog(null) // 새 채팅방 생성을 위해 null 전달
+            showRenameDialog(null) // 새 채팅방 생성
         }
     }
 
     // 채팅방 클릭: 해당 채팅방으로 이동
     override fun onItemClick(chatRoom: ChatRoom) {
         parentFragmentManager.beginTransaction()
-            .replace(R.id.main_frame, ChatFragment.newInstance(chatRoom.id, chatRoom.title))
-            .addToBackStack(null) // 뒤로가기 지원
+            .replace(R.id.fragment_container, ChatFragment.newInstance(chatRoom.id, chatRoom.title))
+            .addToBackStack(null)
             .commit()
     }
 
-    // 채팅방 롱클릭: 관리 메뉴(수정/삭제) 표시
+    // 채팅방 롱클릭: 이름 수정/삭제 메뉴
     override fun onItemLongClick(chatRoom: ChatRoom) {
         val options = arrayOf("이름 수정", "삭제")
         AlertDialog.Builder(requireContext())

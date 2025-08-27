@@ -39,7 +39,7 @@ data class Task(val description: String, var isDone: Boolean = false, var alarmT
 data class Plant(
     val name: String,
     val imageUriString: String,
-    val tasks: MutableList<Task> = mutableListOf()
+    val tasks: MutableList<Task>? = mutableListOf()
 )
 
 // OpenWeatherMap API 응답을 위한 데이터 클래스들
@@ -78,7 +78,7 @@ class PlantAdapter(
         holder.plantPhoto.setImageURI(Uri.parse(plant.imageUriString))
 
         // 체크된(활성화된) 할 일 중에서 가장 첫 번째 것을 찾습니다.
-        val nextCheckedTask = plant.tasks.firstOrNull { it.isDone }
+        val nextCheckedTask = (plant.tasks ?: emptyList()).firstOrNull { it.isDone }
         if (nextCheckedTask != null) {
             holder.taskSummary.text = "할 일: ${nextCheckedTask.description}"
             holder.taskSummary.visibility = View.VISIBLE
@@ -162,7 +162,7 @@ class HomeFragment : Fragment(), PlantAdapter.OnItemClickListener {
     }
 
     override fun onItemClick(position: Int) {
-        val intent = Intent(context, PlantDetailActivity::class.java).apply {
+        val intent = Intent(context, com.example.aiplantbutlernew.PlantDetailActivity::class.java).apply {
             putExtra("plantPosition", position)
             putExtra("plantJson", Gson().toJson(plantList[position]))
         }
@@ -197,8 +197,11 @@ class HomeFragment : Fragment(), PlantAdapter.OnItemClickListener {
             try {
                 val type = object : TypeToken<MutableList<Plant>>() {}.type
                 val loadedPlants: MutableList<Plant> = Gson().fromJson(json, type)
+                val normalized: MutableList<Plant> = loadedPlants
+                    .map { it.copy(tasks = it.tasks ?: mutableListOf()) }
+                    .toMutableList()
                 plantList.clear()
-                plantList.addAll(loadedPlants)
+                plantList.addAll(normalized)
             } catch (e: Exception) {
                 plantList.clear()
                 savePlants()

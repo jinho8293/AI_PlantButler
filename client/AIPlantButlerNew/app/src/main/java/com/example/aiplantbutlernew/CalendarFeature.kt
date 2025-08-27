@@ -5,52 +5,50 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
-class Calendar : Fragment() {
+/**
+ * 의존성 없이 동작하는 썸네일 캘린더 + 일기 프래그먼트 (모던한 카드형 UI)
+ */
+class CalendarLegacyFragment : Fragment() {
 
     private val prefsName = "diary_prefs"
     private val prefPhotosKey = "photo_map"
     private val reqPickImage = 4011
 
-    private var currentMonth: java.util.Calendar = java.util.Calendar.getInstance().apply {
-        set(java.util.Calendar.DAY_OF_MONTH, 1)
-        set(java.util.Calendar.HOUR_OF_DAY, 0)
-        set(java.util.Calendar.MINUTE, 0)
-        set(java.util.Calendar.SECOND, 0)
-        set(java.util.Calendar.MILLISECOND, 0)
+    // 상태
+    private var currentMonth: Calendar = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
     }
     private var selectedDayKey: Long = startOfDayKey(System.currentTimeMillis())
 
+    // UI refs
     private lateinit var tvMonth: TextView
     private lateinit var rvGrid: RecyclerView
-
-    // editor block (initially hidden until a date is tapped)
-    private lateinit var editorContainer: LinearLayout
     private lateinit var tvSelectedDate: TextView
+    private lateinit var etDiary: EditText
     private lateinit var ivPreview: ImageView
     private lateinit var btnPick: Button
     private lateinit var btnClearPhoto: Button
-    private lateinit var etDiary: EditText
     private lateinit var btnSave: Button
 
+    // 데이터(사진 맵 캐시)
     private val photoMap: MutableMap<Long, Uri> = mutableMapOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,7 +82,7 @@ class Calendar : Fragment() {
 
         // ===== 상단 그린 헤더 =====
         val header = LinearLayout(ctx).apply {
-            setBackgroundColor(0xFF1DB954.toInt())
+            setBackgroundColor(0xFF1DB954.toInt()) // 녹색 톤
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -98,14 +96,13 @@ class Calendar : Fragment() {
             background = null
             setColorFilter(Color.WHITE)
             contentDescription = "뒤로"
-            setOnClickListener { activity?.onBackPressedDispatcher?.onBackPressed() }
         }
         val headerTitle = TextView(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             text = "Home"
             setTextColor(Color.WHITE)
             textSize = 20f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTypeface(typeface, Typeface.BOLD)
             gravity = Gravity.CENTER
         }
         val calendarIcon = ImageButton(ctx).apply {
@@ -119,7 +116,7 @@ class Calendar : Fragment() {
         header.addView(calendarIcon)
         page.addView(header)
 
-        // ===== 카드 컨테이너 =====
+        // ===== 카드 컨테이너 (흰 배경, 상단 모서리 둥글게 느낌은 margin으로 대체) =====
         val card = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -135,10 +132,11 @@ class Calendar : Fragment() {
         }
         page.addView(card)
 
+        // 제목
         val title = TextView(ctx).apply {
             text = "Calendar"
             textSize = 22f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTypeface(typeface, Typeface.BOLD)
         }
         card.addView(title)
 
@@ -150,7 +148,7 @@ class Calendar : Fragment() {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(8) }
         }
-        val dows = listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")
+        val dows = listOf("Sur","Mo","My","Th","Fr","Stt","Su") // 샘플 표기 스타일
         dows.forEach { s ->
             val t = TextView(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -162,7 +160,7 @@ class Calendar : Fragment() {
         }
         card.addView(dowRow)
 
-        // 월 컨트롤
+        // 헤더(이전/월/다음)
         val monthCtl = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -180,7 +178,7 @@ class Calendar : Fragment() {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             gravity = Gravity.CENTER
             textSize = 16f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTypeface(typeface, Typeface.BOLD)
         }
         val btnNext = ImageButton(ctx).apply {
             setImageResource(android.R.drawable.ic_media_next)
@@ -192,32 +190,26 @@ class Calendar : Fragment() {
         monthCtl.addView(btnNext)
         card.addView(monthCtl)
 
-        // 캘린더 그리드
+        // 캘린더 그리드 (얇은 그리드라인 효과를 위해 cell margin 사용)
         rvGrid = RecyclerView(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(360)
             ).apply { topMargin = dp(6) }
             layoutManager = GridLayoutManager(ctx, 7)
             isNestedScrollingEnabled = false
-            setBackgroundColor(0xFFEFEFEF.toInt())
+            setBackgroundColor(0xFFEFEFEF.toInt()) // 라인 느낌
         }
         card.addView(rvGrid)
 
-        // ====== 에디터 블록 (초기 숨김) ======
-        editorContainer = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
+        // 선택 영역 (미리보기/일기)
+        tvSelectedDate = TextView(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(12) }
-            visibility = View.GONE
+            setTypeface(typeface, Typeface.BOLD)
         }
-        card.addView(editorContainer)
-
-        tvSelectedDate = TextView(ctx).apply {
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-        editorContainer.addView(tvSelectedDate)
+        card.addView(tvSelectedDate)
 
         ivPreview = ImageView(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -226,7 +218,7 @@ class Calendar : Fragment() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "사진 미리보기"
         }
-        editorContainer.addView(ivPreview)
+        card.addView(ivPreview)
 
         val btnRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -239,12 +231,14 @@ class Calendar : Fragment() {
             text = "사진 선택"
         }
         btnClearPhoto = Button(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = dp(8) }
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                leftMargin = dp(8)
+            }
             text = "사진 삭제"
         }
         btnRow.addView(btnPick)
         btnRow.addView(btnClearPhoto)
-        editorContainer.addView(btnRow)
+        card.addView(btnRow)
 
         etDiary = EditText(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -253,7 +247,7 @@ class Calendar : Fragment() {
             gravity = Gravity.TOP or Gravity.START
             hint = "일기를 입력하세요"
         }
-        editorContainer.addView(etDiary)
+        card.addView(etDiary)
 
         btnSave = Button(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -261,17 +255,23 @@ class Calendar : Fragment() {
             ).apply { topMargin = dp(8) }
             text = "저장"
         }
-        editorContainer.addView(btnSave)
+        card.addView(btnSave)
 
-        // 동작 바인딩
+        // ===== 동작 바인딩 =====
         fun refreshMonthUI() {
             tvMonth.text = SimpleDateFormat("yyyy년 M월", Locale.getDefault()).format(currentMonth.time)
             rvGrid.adapter = MonthAdapter(buildDaysOfMonth(currentMonth), selectedDayKey)
         }
-        btnPrev.setOnClickListener { currentMonth.add(java.util.Calendar.MONTH, -1); refreshMonthUI() }
-        btnNext.setOnClickListener { currentMonth.add(java.util.Calendar.MONTH, 1); refreshMonthUI() }
+        btnPrev.setOnClickListener { currentMonth.add(Calendar.MONTH, -1); refreshMonthUI() }
+        btnNext.setOnClickListener { currentMonth.add(Calendar.MONTH, 1); refreshMonthUI() }
 
-        btnPick.setOnClickListener { openImagePicker() }
+        btnPick.setOnClickListener {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+            }
+            startActivityForResult(intent, reqPickImage)
+        }
         btnClearPhoto.setOnClickListener {
             savePhotoUri(requireContext(), selectedDayKey, null)
             photoMap.remove(selectedDayKey)
@@ -283,10 +283,10 @@ class Calendar : Fragment() {
             Toast.makeText(requireContext(), "저장되었습니다.", Toast.LENGTH_SHORT).show()
         }
 
-        // 초기에는 편집 영역 숨김
-        editorContainer.visibility = View.GONE
-
+        // 초기
+        setSelectedDate(selectedDayKey)
         refreshMonthUI()
+
         return rootScroll
     }
 
@@ -306,31 +306,18 @@ class Calendar : Fragment() {
         }
     }
 
-    private fun openImagePicker() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "image/*"
-        }
-        startActivityForResult(intent, reqPickImage)
-    }
-
-    private fun onDateTapped(dayKey: Long) {
-        // 날짜를 선택하면 편집 영역을 표시
-        if (editorContainer.visibility != View.VISIBLE) editorContainer.visibility = View.VISIBLE
-        setSelectedDate(dayKey)
-    }
-
     private fun setSelectedDate(dayKey: Long) {
         selectedDayKey = dayKey
         tvSelectedDate.text = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(dayKey)
         refreshForSelectedDay()
         rvGrid.adapter = MonthAdapter(buildDaysOfMonth(currentMonth), selectedDayKey)
-        // 키보드 포커스는 사용자가 메모를 탭했을 때만 보이도록 유지 (자동 표시 제거)
     }
 
     private fun refreshForSelectedDay() {
         etDiary.setText(loadDiaryText(requireContext(), selectedDayKey))
-        val uri = photoMap[selectedDayKey] ?: loadPhotoUri(requireContext(), selectedDayKey)?.also { photoMap[selectedDayKey] = it }
+        val uri = photoMap[selectedDayKey] ?: loadPhotoUri(requireContext(), selectedDayKey)?.also {
+            photoMap[selectedDayKey] = it
+        }
         if (uri != null) {
             try {
                 requireContext().contentResolver.openInputStream(uri).use { ins ->
@@ -341,21 +328,22 @@ class Calendar : Fragment() {
         } else ivPreview.setImageDrawable(null)
     }
 
-    private fun buildDaysOfMonth(monthCal: java.util.Calendar): List<Long?> {
-        val temp = (monthCal.clone() as java.util.Calendar).apply { set(java.util.Calendar.DAY_OF_MONTH, 1) }
-        val leading = temp.get(java.util.Calendar.DAY_OF_WEEK) - java.util.Calendar.SUNDAY
-        val daysInMonth = temp.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    private fun buildDaysOfMonth(monthCal: Calendar): List<Long?> {
+        val temp = (monthCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
+        val leading = temp.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
+        val daysInMonth = temp.getActualMaximum(Calendar.DAY_OF_MONTH)
         val list = mutableListOf<Long?>()
         repeat(leading) { list += null }
         repeat(daysInMonth) { d ->
-            val c = temp.clone() as java.util.Calendar
-            c.set(java.util.Calendar.DAY_OF_MONTH, d + 1)
+            val c = temp.clone() as Calendar
+            c.set(Calendar.DAY_OF_MONTH, d + 1)
             list += c.timeInMillis
         }
         while (list.size % 7 != 0) list += null
         return list
     }
 
+    // 저장/로딩
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
     private fun diaryTextKey(dayKey: Long) = "text_$dayKey"
     private fun saveDiaryText(ctx: Context, dayKey: Long, text: String) { prefs(ctx).edit().putString(diaryTextKey(dayKey), text).apply() }
@@ -388,24 +376,25 @@ class Calendar : Fragment() {
     }
 
     private fun startOfDayKey(millis: Long): Long {
-        val c = java.util.Calendar.getInstance().apply {
+        val c = Calendar.getInstance().apply {
             timeInMillis = millis
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
         return c.timeInMillis
     }
-
     private fun dp(value: Int): Int = (resources.displayMetrics.density * value).toInt()
 
+    // 7열 캘린더 셀 어댑터 (셀 사이 간격을 margin으로 만들어 라인처럼 보이게)
     private inner class MonthAdapter(
         private val items: List<Long?>,
         private val selectedKey: Long
     ) : RecyclerView.Adapter<MonthAdapter.VH>() {
 
-        inner class VH(val root: LinearLayout, val tv: TextView, val iv: ImageView) : RecyclerView.ViewHolder(root)
+        inner class VH(val root: LinearLayout, val tv: TextView, val iv: ImageView) :
+            RecyclerView.ViewHolder(root)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
             val ctx = parent.context
@@ -415,8 +404,11 @@ class Calendar : Fragment() {
                 setPadding(dp(2), dp(2), dp(2), dp(2))
                 setBackgroundColor(Color.WHITE)
             }
+            // 간격(그리드 라인 효과)
             (cell.layoutParams as ViewGroup.LayoutParams).let {
-                if (it is RecyclerView.LayoutParams) it.setMargins(dp(1), dp(1), dp(1), dp(1))
+                if (it is RecyclerView.LayoutParams) {
+                    it.setMargins(dp(1), dp(1), dp(1), dp(1))
+                }
             }
             val tv = TextView(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -448,13 +440,13 @@ class Calendar : Fragment() {
                 holder.root.setOnClickListener(null)
                 return
             }
-            val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
-            val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
-            val dow = cal.get(java.util.Calendar.DAY_OF_WEEK)
+            val cal = Calendar.getInstance().apply { timeInMillis = millis }
+            val day = cal.get(Calendar.DAY_OF_MONTH)
+            val dow = cal.get(Calendar.DAY_OF_WEEK)
             holder.tv.text = day.toString()
             when (dow) {
-                java.util.Calendar.SUNDAY -> holder.tv.setTextColor(0xFFD32F2F.toInt())
-                java.util.Calendar.SATURDAY -> holder.tv.setTextColor(0xFF1976D2.toInt())
+                Calendar.SUNDAY -> holder.tv.setTextColor(0xFFD32F2F.toInt())
+                Calendar.SATURDAY -> holder.tv.setTextColor(0xFF1976D2.toInt())
                 else -> holder.tv.setTextColor(0xFF333333.toInt())
             }
             val key = startOfDayKey(millis)
@@ -476,9 +468,7 @@ class Calendar : Fragment() {
                 todayKey -> holder.root.setBackgroundColor(0xFFF7F7F7.toInt())
                 else -> holder.root.setBackgroundColor(Color.WHITE)
             }
-            holder.root.setOnClickListener {
-                onDateTapped(key) // 날짜 탭 시 편집 영역을 표시 (자동 사진 선택 창은 열지 않음)
-            }
+            holder.root.setOnClickListener { setSelectedDate(key) }
         }
     }
 }

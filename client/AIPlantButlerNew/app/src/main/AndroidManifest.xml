@@ -2,16 +2,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network / location / camera -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- Storage / media (T+ uses READ_MEDIA_IMAGES, pre-T uses READ_EXTERNAL_STORAGE) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <!-- Notifications (T+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Exact alarms (Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- NOTE: USE_EXACT_ALARM is a restricted/system permission. Remove to avoid warnings. -->
+
+    <!-- Boot completed to reschedule alarms after reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
@@ -24,8 +32,17 @@
         android:theme="@style/Theme.AIPlantButlerNew"
         tools:targetApi="31">
 
-        <receiver android:name=".AlarmReceiver" android:enabled="true" />
+        <!-- Alarm receiver: keep disabled export (no external broadcasts), add BOOT_COMPLETED filter -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
+        <!-- Launcher activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -34,8 +51,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- App screens -->
         <activity android:name=".AddPlantActivity" />
         <activity android:name=".PlantDetailActivity" />
+        <activity android:name=".CalendarDiaryActivity" />
     </application>
 
 </manifest>
